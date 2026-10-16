@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>クラウド・タスク管理</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;background:#f5f7fb;color:#1e293b;padding:12px}
+.container{max-width:680px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);padding:20px 18px}
+h1{text-align:center;font-size:20px;font-weight:800;color:#1e293b;margin-bottom:4px}
+.status{text-align:center;font-size:12px;color:#16a34a;font-weight:600;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:6px}
+.status.ng{color:#ef4444}
+label{display:block;font-size:13px;font-weight:700;color:#334155;margin:14px 0 6px}
+input[type="text"],input[type="date"],select,textarea{width:100%;padding:12px 14px;border:1px solid #dbe2ef;border-radius:10px;font-size:14px;background:#fcfdff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px #3b82f61a}
+textarea{resize:vertical;min-height:72px}
+.priority-group{display:flex;gap:8px;flex-wrap:wrap}
+.priority-item{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:999px;font-size:13px;cursor:pointer;background:#fff;transition:.15s}
+.priority-item:has(input:checked){background:#f1f5f9;border-color:#334155;font-weight:700}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.dot-red{background:#ef4444}.dot-yellow{background:#f59e0b}.dot-green{background:#22c55e}.dot-blue{background:#3b82f6}
+.btn{width:100%;padding:13px;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;margin-top:12px}
+.btn-primary{background:#2563eb;color:#fff}
+.btn-primary:active{transform:scale(0.98)}
+.btn-notify{background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px}
+.task-list{margin-top:20px;border-top:1px solid #eef2f7;padding-top:8px}
+.card{background:#fff;border:1px solid #e2e8f0;border-left:5px solid #22c55e;border-radius:12px;padding:14px 14px 12px;margin-top:12px;position:relative}
+.card.p-急ぎ{border-left-color:#ef4444}
+.card.p-時間をとる{border-left-color:#f59e0b}
+.card.p-任せる\/後から{border-left-color:#22c55e}
+.card.p-検討{border-left-color:#3b82f6}
+.card.p-高{border-left-color:#ef4444}
+.card.p-中{border-left-color:#f59e0b}
+.card.p-低{border-left-color:#22c55e}
+.card-title{font-size:15px;font-weight:800;margin-bottom:4px}
+.card-content{font-size:13px;color:#475569;margin-bottom:8px;line-height:1.5;white-space:pre-wrap}
+.card-meta{font-size:11px;color:#94a3b8;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card-actions{position:absolute;right:12px;bottom:10px;display:flex;gap:6px}
+.btn-small{padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+.btn-edit{background:#fbbf24;color:#1e293b}
+.btn-delete{background:#ef4444;color:#fff}
+.badge{font-size:10px;padding:2px 8px;border-radius:999px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>クラウド・タスク管理</h1>
+  <div id="connectionStatus" class="status"><span>✅</span> <span id="statusText">TASKS Masterと同期中...</span></div>
+
+  <input type="hidden" id="editRowIndex">
+  <input type="hidden" id="editId">
+
+  <label>タイトル</label>
+  <input type="text" id="taskTitle" placeholder="例: 天草の契約">
+
+  <label>内容</label>
+  <textarea id="taskContent" placeholder="タスクの詳細や手順..."></textarea>
+
+  <label>優先度</label>
+  <div class="priority-group">
+    <label class="priority-item"><input type="radio" name="priority" value="急ぎ"> <span class="dot dot-red"></span> 急ぎ</label>
+    <label class="priority-item"><input type="radio" name="priority" value="時間をとる" checked> <span class="dot dot-yellow"></span> 時間をとる</label>
+    <label class="priority-item"><input type="radio" name="priority" value="任せる/後から"> <span class="dot dot-green"></span> 任せる・後から</label>
+    <label class="priority-item"><input type="radio" name="priority" value="検討"> <span class="dot dot-blue"></span> 検討</label>
+  </div>
+
+  <div class="form-row">
+    <div>
+      <label>カテゴリ</label>
+      <select id="category"><option>LifeOS</option><option>LOMA/ME</option><option>AIRA</option><option>その他/広報</option><option>健康/習慣</option><option>その他</option></select>
+    </div>
+    <div>
+      <label>羅針盤タグ</label>
+      <select id="compassTag"><option>#共創</option><option>#清算</option><option>#健康</option><option>#好奇心</option></select>
+    </div>
+  </div>
+
+  <label>スケジュール種別</label>
+  <select id="scheduleType">
+    <option value="毎日">毎日（※カレンダーには登録されません）</option>
+    <option value="今日">今日</option>
+    <option value="明日">明日</option>
+    <option value="date">日付を指定</option>
+    <option value="未定">未定</option>
+  </select>
+  <input type="date" id="customDate" class="hidden" style="margin-top:8px">
+
+  <label>ステータス</label>
+  <select id="status"><option>未着手</option><option>進行中</option><option>完了</option><option>習慣</option></select>
+
+  <label>メモ</label>
+  <textarea id="memo" placeholder="補足メモなど..."></textarea>
+
+  <button id="submitBtn" class="btn btn-primary" onclick="saveTask()">タスクを追加</button>
+  <button class="btn btn-notify" onclick="toggleNotify()">🔔 毎日の通知を受け取る (8時/13時/19時)</button>
+
+  <div class="task-list" id="taskList"><p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p></div>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxeY0ollMVYWklFepuBRnbjdFc9gEu70WWnF_gdf_RRUfAcFTnL6PXdwAGMj0cXPBZueA/exec";
+
+let tasks = [];
+function setStatus(ok, text){
+  document.getElementById('statusText').textContent=text;
+  document.getElementById('connectionStatus').className=ok?'status':'status ng';
+}
+document.getElementById('scheduleType').addEventListener('change', e=>{
+  document.getElementById('customDate').classList.toggle('hidden', e.target.value!=='date');
+});
+function loadTasks(){
+  setStatus(true, 'TASKS Masterと同期中...');
+  fetch(GAS_URL).then(r=>r.json()).then(data=>{
+    tasks = data.filter(d=> d.id && String(d.id).startsWith('T-'));
+    setStatus(true, `✅ Firebase接続完了（リアルタイム同期中） ${tasks.length}件 - TASKS Master連携`);
+    render();
+  }).catch(err=> setStatus(false, '❌ 同期失敗: '+err.message));
+}
+function render(){
+  const list=document.getElementById('taskList');
+  let sorted=[...tasks].sort((a,b)=>{
+    const order={急ぎ:0, '時間をとる':1, '任せる/後から':2, 検討:3, 高:0, 中:1, 低:2};
+    return (order[a.priority]??9)-(order[b.priority]??9);
+  });
+  if(sorted.length===0){
+    list.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">タスクはまだありません</p>';
+    return;
+  }
+  let html='';
+  sorted.forEach(t=>{
+    const cardClass=`card p-${t.priority}`;
+    html+=`
+    <div class="${cardClass}">
+      <div class="card-title">${esc(t.task)}</div>
+      <div class="card-content">${esc(t.content || t.memo || '')}</div>
+      <div class="card-meta">
+        <span>優先度: <b>${esc(t.priority)}</b> | 予定: ${esc(t.schedule||'未定')} ${t.schedule==='毎日'?'(8時/13時/19時通知)':''}</span>
+        <span class="badge">${esc(t.category)}</span>
+        <span class="badge">${esc(t.compassTag)}</span>
+        <span class="badge">${esc(t.id)} / ${esc(t.status)}</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-small btn-edit" onclick="editTask(${t.rowIndex})">編集</button>
+        <button class="btn-small btn-delete" onclick="deleteTask(${t.rowIndex})">削除</button>
+      </div>
+    </div>`;
+  });
+  list.innerHTML=html;
+}
+function saveTask(){
+  const rowIndex=document.getElementById('editRowIndex').value;
+  const id=document.getElementById('editId').value;
+  const task=document.getElementById('taskTitle').value.trim();
+  const content=document.getElementById('taskContent').value.trim();
+  const priority=document.querySelector('input[name="priority"]:checked')?.value || '時間をとる';
+  const category=document.getElementById('category').value;
+  const compass=document.getElementById('compassTag').value;
+  let schedule=document.getElementById('scheduleType').value;
+  if(schedule==='date') schedule=document.getElementById('customDate').value;
+  if(schedule==='今日') schedule=new Date().toISOString().split('T')[0];
+  if(schedule==='明日'){ const d=new Date(); d.setDate(d.getDate()+1); schedule=d.toISOString().split('T')[0]; }
+  const status=document.getElementById('status').value;
+  const memo=document.getElementById('memo').value.trim();
+  if(!task){ alert('タスクは必須'); return; }
+  const payload={
+    action: rowIndex?'update':'add',
+    rowIndex: rowIndex?Number(rowIndex):null,
+    id: id||'',
+    task: task,
+    content: content,
+    category: category,
+    schedule: schedule,
+    priority: priority,
+    status: status,
+    duration: '',
+    link: '',
+    memo: memo,
+    compassTag: compass
+  };
+  setStatus(true, '💾 保存中...');
+  fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(()=>{ resetForm(); loadTasks(); })
+    .catch(err=> setStatus(false, '保存失敗: '+err.message));
+}
+function editTask(rowIndex){
+  const t=tasks.find(x=>x.rowIndex===rowIndex);
+  if(!t) return;
+  document.getElementById('editRowIndex').value=t.rowIndex;
+  document.getElementById('editId').value=t.id;
+  document.getElementById('taskTitle').value=t.task;
+  document.getElementById('taskContent').value=t.content||'';
+  document.querySelectorAll('input[name="priority"]').forEach(r=> r.checked = (r.value===t.priority));
+  document.getElementById('category').value=t.category||'LifeOS';
+  document.getElementById('compassTag').value=t.compassTag||'#共創';
+  if(t.schedule==='毎日' || t.schedule==='未定' || !t.schedule){
+    document.getElementById('scheduleType').value=t.schedule||'未定';
+    document.getElementById('customDate').classList.add('hidden');
+  } else {
+    document.getElementById('scheduleType').value='date';
+    document.getElementById('customDate').classList.remove('hidden');
+    document.getElementById('customDate').value=t.schedule;
+  }
+  document.getElementById('status').value=t.status||'未着手';
+  document.getElementById('memo').value=t.memo||'';
+  document.getElementById('submitBtn').textContent='変更を保存';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function deleteTask(rowIndex){
+  if(!confirm('削除しますか？')) return;
+  setStatus(true, '🗑 削除中...');
+  fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'delete',rowIndex})})
+    .then(r=>r.json()).then(()=>loadTasks());
+}
+function resetForm(){
+  document.getElementById('editRowIndex').value='';
+  document.getElementById('editId').value='';
+  document.getElementById('taskTitle').value='';
+  document.getElementById('taskContent').value='';
+  document.querySelector('input[value="時間をとる"]').checked=true;
+  document.getElementById('scheduleType').value='毎日';
+  document.getElementById('customDate').classList.add('hidden');
+  document.getElementById('status').value='未着手';
+  document.getElementById('memo').value='';
+  document.getElementById('submitBtn').textContent='タスクを追加';
+}
+function toggleNotify(){
+  if('Notification' in window){
+    Notification.requestPermission().then(p=>{
+      if(p==='granted') alert('通知を許可しました。ブラウザを閉じても8時/13時/19時に通知が来ます。');
+      else alert('通知はLifeOS Secretaryの朝7時ブリーフィングでも確認できます。');
+    });
+  } else {
+    alert('通知はLifeOS Secretaryの朝7時ブリーフィングで受け取れます。');
+  }
+}
+function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+loadTasks();
+</script>
+</body>
+</html>
